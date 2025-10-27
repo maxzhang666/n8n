@@ -104,6 +104,7 @@ import { AddTimestampsToRoleAndRoleIndexes1756906557570 } from '../common/175690
 import { ChangeValueTypesForInsights1759399811000 } from '../common/1759399811000-ChangeValueTypesForInsights';
 import { CreateChatHubTables1760019379982 } from '../common/1760019379982-CreateChatHubTables';
 import { UniqueRoleNames1760020838000 } from '../common/1760020838000-UniqueRoleNames';
+import { BackfillMissingWorkflowHistoryRecords1761609600000 } from '../common/1761609600000-BackfillMissingWorkflowHistoryRecords';
 import type { Migration } from '../migration-types';
 import { UpdateParentFolderIdColumn1740445074052 } from '../mysqldb/1740445074052-UpdateParentFolderIdColumn';
 import { LinkRoleToProjectRelationTable1753953244168 } from './../common/1753953244168-LinkRoleToProjectRelationTable';
@@ -217,4 +218,5 @@ export const mysqlMigrations: Migration[] = [
 	CreateWorkflowDependencyTable1760314000000,
 	DropUnusedChatHubColumns1760965142113,
 	AddWorkflowVersionColumn1761047826451,
+	BackfillMissingWorkflowHistoryRecords1761609600000,
 ];
