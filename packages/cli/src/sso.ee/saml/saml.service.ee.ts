@@ -7,8 +7,7 @@ import { OnPubSubEvent } from '@n8n/decorators';
 import { Container, Service } from '@n8n/di';
 import axios from 'axios';
 import type express from 'express';
-import https from 'https';
-import { InstanceSettings } from 'n8n-core';
+import { createHttpsProxyAgent, InstanceSettings } from 'n8n-core';
 import { jsonParse, UnexpectedError } from 'n8n-workflow';
 import { type IdentityProviderInstance, type ServiceProviderInstance } from 'samlify';
 import type { BindingContext, PostBindingContext } from 'samlify/types/src/entity';
@@ -444,10 +443,24 @@ export class SamlService {
 		if (!this._samlPreferences.metadataUrl)
 			throw new BadRequestError('Error fetching SAML Metadata, no Metadata URL set');
 		try {
-			// TODO:SAML: this will not work once axios is upgraded to > 1.2.0 (see checkServerIdentity)
-			const agent = new https.Agent({
-				rejectUnauthorized: !this._samlPreferences.ignoreSSL,
+			// Create a proxy-aware HTTPS agent that respects HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+			// environment variables while also supporting SSL certificate validation options
+			const agent = createHttpsProxyAgent(
+				null, // Uses proxy from environment variables
+				this._samlPreferences.metadataUrl,
+				{
+					rejectUnauthorized: !this._samlPreferences.ignoreSSL,
+				},
+			);
+
+			this.logger.debug('Fetching SAML metadata from URL', {
+				url: this._samlPreferences.metadataUrl,
+				ignoreSSL: this._samlPreferences.ignoreSSL,
+				hasProxy: Boolean(
+					process.env.HTTP_PROXY ?? process.env.HTTPS_PROXY ?? process.env.ALL_PROXY,
+				),
 			});
+
 			const response = await axios.get(this._samlPreferences.metadataUrl, { httpsAgent: agent });
 			if (response.status === 200 && response.data) {
 				const xml = (await response.data) as string;

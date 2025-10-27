@@ -15,6 +15,7 @@ import { randomUUID } from 'crypto';
 import { Cipher, InstanceSettings } from 'n8n-core';
 import { jsonParse, UserError } from 'n8n-workflow';
 import * as client from 'openid-client';
+import { EnvHttpProxyAgent } from 'undici';
 
 import { BadRequestError } from '@/errors/response-errors/bad-request.error';
 import { ForbiddenError } from '@/errors/response-errors/forbidden.error';
@@ -422,7 +423,7 @@ export class OidcService {
 			newConfig.clientSecret = this.oidcConfig.clientSecret;
 		}
 		try {
-			const discoveredMetadata = await client.discovery(
+			const discoveredMetadata = await this.createProxyAwareConfiguration(
 				discoveryEndpoint,
 				newConfig.clientId,
 				newConfig.clientSecret,
@@ -484,6 +485,46 @@ export class OidcService {
 		  } & OidcRuntimeConfig)
 		| undefined;
 
+	/**
+	 * Creates a proxy-aware configuration for openid-client.
+	 * This method configures customFetch to respect HTTP_PROXY, HTTPS_PROXY, and NO_PROXY environment variables.
+	 */
+	private async createProxyAwareConfiguration(
+		discoveryUrl: URL,
+		clientId: string,
+		clientSecret: string,
+	): Promise<client.Configuration> {
+		const configuration = await client.discovery(discoveryUrl, clientId, clientSecret);
+
+		// Check if proxy environment variables are set
+		const hasProxyConfig =
+			process.env.HTTP_PROXY ?? process.env.HTTPS_PROXY ?? process.env.ALL_PROXY;
+
+		if (hasProxyConfig) {
+			this.logger.debug('Configuring OIDC client with proxy support', {
+				HTTP_PROXY: process.env.HTTP_PROXY,
+				HTTPS_PROXY: process.env.HTTPS_PROXY,
+				NO_PROXY: process.env.NO_PROXY,
+				ALL_PROXY: process.env.ALL_PROXY,
+			});
+
+			// Create a proxy agent that automatically reads from environment variables
+			const proxyAgent = new EnvHttpProxyAgent();
+
+			// Configure customFetch to use the proxy agent
+			configuration[client.customFetch] = async (...args) => {
+				const [url, options] = args;
+				return await fetch(url, {
+					...options,
+					// @ts-expect-error - dispatcher is an undici-specific option not in standard fetch
+					dispatcher: proxyAgent,
+				});
+			};
+		}
+
+		return configuration;
+	}
+
 	private async getOidcConfiguration(): Promise<client.Configuration> {
 		const now = Date.now();
 		if (
@@ -496,7 +537,7 @@ export class OidcService {
 		) {
 			this.cachedOidcConfiguration = {
 				...this.oidcConfig,
-				configuration: client.discovery(
+				configuration: this.createProxyAwareConfiguration(
 					this.oidcConfig.discoveryEndpoint,
 					this.oidcConfig.clientId,
 					this.oidcConfig.clientSecret,

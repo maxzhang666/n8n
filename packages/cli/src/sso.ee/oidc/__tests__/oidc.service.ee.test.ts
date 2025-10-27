@@ -7,8 +7,13 @@ import { mock } from 'jest-mock-extended';
 import type { Cipher, InstanceSettings } from 'n8n-core';
 
 import * as client from 'openid-client';
+import { EnvHttpProxyAgent } from 'undici';
 
 import type { JwtService } from '@/services/jwt.service';
+
+jest.mock('undici', () => ({
+	EnvHttpProxyAgent: jest.fn().mockImplementation(() => ({})),
+}));
 import type { UrlService } from '@/services/url.service';
 
 import * as ssoHelpers from '../../sso-helpers';
@@ -535,6 +540,118 @@ describe('OidcService', () => {
 			const user = await oidcService.loginUser(callbackUrl, storedState, storedNonce);
 			expect(user).toBeDefined();
 			expect(user.email).toEqual('john.doe@test.com');
+		});
+	});
+
+	describe('proxy configuration', () => {
+		const originalEnv = process.env;
+
+		// Helper function to create a proper mock Response
+		const createMockResponse = () => {
+			return {
+				ok: true,
+				status: 200,
+				headers: new Headers({ 'content-type': 'application/json' }),
+				json: jest.fn().mockResolvedValue({
+					issuer: 'https://example.com',
+					authorization_endpoint: 'https://example.com/auth',
+					token_endpoint: 'https://example.com/token',
+					userinfo_endpoint: 'https://example.com/userinfo',
+					jwks_uri: 'https://example.com/jwks',
+				}),
+			} as unknown as Response;
+		};
+
+		beforeEach(() => {
+			// Reset environment before each test
+			process.env = { ...originalEnv };
+			// Reset the mock between tests
+			(EnvHttpProxyAgent as jest.Mock).mockClear();
+		});
+
+		afterEach(() => {
+			// Restore original environment after each test
+			process.env = originalEnv;
+		});
+
+		it('should instantiate EnvHttpProxyAgent when HTTP_PROXY is set', async () => {
+			// Set proxy environment variable
+			process.env.HTTP_PROXY = 'http://proxy.example.com:8080';
+
+			const discoveryUrl = new URL('https://example.com/.well-known/openid-configuration');
+			const clientId = 'test-client';
+			const clientSecret = 'test-secret';
+
+			global.fetch = jest.fn().mockResolvedValue(createMockResponse());
+
+			// Call the private method directly using type assertion
+			await (oidcService as any).createProxyAwareConfiguration(
+				discoveryUrl,
+				clientId,
+				clientSecret,
+			);
+
+			// Verify EnvHttpProxyAgent was instantiated
+			expect(EnvHttpProxyAgent).toHaveBeenCalled();
+		});
+
+		it('should not instantiate EnvHttpProxyAgent when no proxy env vars are set', async () => {
+			// Ensure no proxy env vars are set
+			delete process.env.HTTP_PROXY;
+			delete process.env.HTTPS_PROXY;
+			delete process.env.ALL_PROXY;
+
+			const discoveryUrl = new URL('https://example.com/.well-known/openid-configuration');
+			const clientId = 'test-client';
+			const clientSecret = 'test-secret';
+
+			global.fetch = jest.fn().mockResolvedValue(createMockResponse());
+
+			// Call the private method directly
+			await (oidcService as any).createProxyAwareConfiguration(
+				discoveryUrl,
+				clientId,
+				clientSecret,
+			);
+
+			// Should not instantiate EnvHttpProxyAgent when no proxy is configured
+			expect(EnvHttpProxyAgent).not.toHaveBeenCalled();
+		});
+
+		it('should instantiate EnvHttpProxyAgent when HTTPS_PROXY is set', async () => {
+			process.env.HTTPS_PROXY = 'https://proxy.example.com:8443';
+
+			const discoveryUrl = new URL('https://example.com/.well-known/openid-configuration');
+			const clientId = 'test-client';
+			const clientSecret = 'test-secret';
+
+			global.fetch = jest.fn().mockResolvedValue(createMockResponse());
+
+			await (oidcService as any).createProxyAwareConfiguration(
+				discoveryUrl,
+				clientId,
+				clientSecret,
+			);
+
+			expect(EnvHttpProxyAgent).toHaveBeenCalled();
+		});
+
+		it('should instantiate EnvHttpProxyAgent when ALL_PROXY is set', async () => {
+			process.env.ALL_PROXY = 'http://all-proxy.example.com:8888';
+
+			const discoveryUrl = new URL('https://example.com/.well-known/openid-configuration');
+			const clientId = 'test-client';
+			const clientSecret = 'test-secret';
+
+			global.fetch = jest.fn().mockResolvedValue(createMockResponse());
+
+			await (oidcService as any).createProxyAwareConfiguration(
+				discoveryUrl,
+				clientId,
+				clientSecret,
+			);
+
+			expect(EnvHttpProxyAgent).toHaveBeenCalled();
 		});
 	});
 });

@@ -649,4 +649,155 @@ describe('SamlService', () => {
 			expect(settingsRepository.delete).toHaveBeenCalledWith({ key: SAML_PREFERENCES_DB_KEY });
 		});
 	});
+
+	describe('proxy configuration', () => {
+		const originalEnv = process.env;
+		const validMetadataXml =
+			'<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" entityID="https://saml.example.com/entityid" validUntil="2035-05-07T13:33:47.181Z">\n  <md:IDPSSODescriptor WantAuthnRequestsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">\n    <md:KeyDescriptor use="signing">\n      <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">\n        <ds:X509Data>\n          <ds:X509Certificate>MIIC4jCCAcoCCQC33wnybT5QZDANBgkqhkiG9w0BAQsFADAyMQswCQYDVQQGEwJV\nSzEPMA0GA1UECgwGQm94eUhRMRIwEAYDVQQDDAlNb2NrIFNBTUwwIBcNMjIwMjI4\nMjE0NjM4WhgPMzAyMTA3MDEyMTQ2MzhaMDIxCzAJBgNVBAYTAlVLMQ8wDQYDVQQK\nDAZCb3h5SFExEjAQBgNVBAMMCU1vY2sgU0FNTDCCASIwDQYJKoZIhvcNAQEBBQAD\nggEPADCCAQoCggEBALGfYettMsct1T6tVUwTudNJH5Pnb9GGnkXi9Zw/e6x45DD0\nRuRONbFlJ2T4RjAE/uG+AjXxXQ8o2SZfb9+GgmCHuTJFNgHoZ1nFVXCmb/Hg8Hpd\n4vOAGXndixaReOiq3EH5XvpMjMkJ3+8+9VYMzMZOjkgQtAqO36eAFFfNKX7dTj3V\npwLkvz6/KFCq8OAwY+AUi4eZm5J57D31GzjHwfjH9WTeX0MyndmnNB1qV75qQR3b\n2/W5sGHRv+9AarggJkF+ptUkXoLtVA51wcfYm6hILptpde5FQC8RWY1YrswBWAEZ\nNfyrR4JeSweElNHg4NVOs4TwGjOPwWGqzTfgTlECAwEAATANBgkqhkiG9w0BAQsF\nAAOCAQEAAYRlYflSXAWoZpFfwNiCQVE5d9zZ0DPzNdWhAybXcTyMf0z5mDf6FWBW\n5Gyoi9u3EMEDnzLcJNkwJAAc39Apa4I2/tml+Jy29dk8bTyX6m93ngmCgdLh5Za4\nkhuU3AM3L63g7VexCuO7kwkjh/+LqdcIXsVGO6XDfu2QOs1Xpe9zIzLpwm/RNYeX\nUjbSj5ce/jekpAw7qyVVL4xOyh8AtUW1ek3wIw1MJvEgEPt0d16oshWJpoS1OT8L\nr/22SvYEo3EmSGdTVGgk3x3s+A0qWAqTcyjr7Q4s/GKYRFfomGwz0TZ4Iw1ZN99M\nm0eo2USlSRTVl7QHRTuiuSThHpLKQQ==</ds:X509Certificate>\n        </ds:X509Data>\n      </ds:KeyInfo>\n    </md:KeyDescriptor>\n    <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat>\n    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://mocksaml.com/api/saml/sso"/>\n    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://mocksaml.com/api/saml/sso"/>\n  </md:IDPSSODescriptor>\n</md:EntityDescriptor>';
+
+		beforeEach(() => {
+			// Reset environment before each test
+			process.env = { ...originalEnv };
+			jest.spyOn(samlService, 'loadSamlify').mockResolvedValue(undefined);
+		});
+
+		afterEach(() => {
+			// Restore original environment after each test
+			process.env = originalEnv;
+		});
+
+		test('should use proxy when HTTP_PROXY environment variable is set', async () => {
+			// Set proxy environment variable
+			process.env.HTTP_PROXY = 'http://proxy.example.com:8080';
+
+			// Mock the preferences to include a metadataUrl
+			(samlService as any)._samlPreferences = {
+				...mockSamlConfig,
+				metadataUrl: 'https://saml.example.com/metadata',
+			};
+
+			// Mock axios response
+			mockedAxios.get.mockResolvedValue({
+				status: 200,
+				data: validMetadataXml,
+			});
+
+			// Mock validator
+			jest.spyOn(samlService['validator'], 'validateMetadata').mockResolvedValue(true);
+
+			const result = await samlService.fetchMetadataFromUrl();
+
+			expect(result).toBe(validMetadataXml);
+			expect(mockedAxios.get).toHaveBeenCalledWith(
+				'https://saml.example.com/metadata',
+				expect.objectContaining({
+					httpAgent: expect.any(Object),
+					httpsAgent: expect.any(Object),
+				}),
+			);
+		});
+
+		test('should use proxy when HTTPS_PROXY environment variable is set', async () => {
+			// Set proxy environment variable
+			process.env.HTTPS_PROXY = 'https://proxy.example.com:8443';
+
+			// Mock the preferences to include a metadataUrl
+			(samlService as any)._samlPreferences = {
+				...mockSamlConfig,
+				metadataUrl: 'https://saml.example.com/metadata',
+			};
+
+			// Mock axios response
+			mockedAxios.get.mockResolvedValue({
+				status: 200,
+				data: validMetadataXml,
+			});
+
+			// Mock validator
+			jest.spyOn(samlService['validator'], 'validateMetadata').mockResolvedValue(true);
+
+			const result = await samlService.fetchMetadataFromUrl();
+
+			expect(result).toBe(validMetadataXml);
+			expect(mockedAxios.get).toHaveBeenCalledWith(
+				'https://saml.example.com/metadata',
+				expect.objectContaining({
+					httpsAgent: expect.any(Object),
+				}),
+			);
+		});
+
+		test('should work without proxy when no proxy environment variables are set', async () => {
+			// Ensure no proxy env vars are set
+			delete process.env.HTTP_PROXY;
+			delete process.env.HTTPS_PROXY;
+			delete process.env.ALL_PROXY;
+
+			// Mock the preferences to include a metadataUrl
+			(samlService as any)._samlPreferences = {
+				...mockSamlConfig,
+				metadataUrl: 'https://saml.example.com/metadata',
+			};
+
+			// Mock axios response
+			mockedAxios.get.mockResolvedValue({
+				status: 200,
+				data: validMetadataXml,
+			});
+
+			// Mock validator
+			jest.spyOn(samlService['validator'], 'validateMetadata').mockResolvedValue(true);
+
+			const result = await samlService.fetchMetadataFromUrl();
+
+			expect(result).toBe(validMetadataXml);
+			expect(mockedAxios.get).toHaveBeenCalledWith(
+				'https://saml.example.com/metadata',
+				expect.objectContaining({
+					httpsAgent: expect.any(Object),
+				}),
+			);
+		});
+
+		test('should respect ignoreSSL setting with proxy', async () => {
+			process.env.HTTPS_PROXY = 'https://proxy.example.com:8443';
+
+			// Mock the preferences with ignoreSSL enabled
+			(samlService as any)._samlPreferences = {
+				...mockSamlConfig,
+				metadataUrl: 'https://saml.example.com/metadata',
+				ignoreSSL: true,
+			};
+
+			// Mock axios response
+			mockedAxios.get.mockResolvedValue({
+				status: 200,
+				data: validMetadataXml,
+			});
+
+			// Mock validator
+			jest.spyOn(samlService['validator'], 'validateMetadata').mockResolvedValue(true);
+
+			const result = await samlService.fetchMetadataFromUrl();
+
+			expect(result).toBe(validMetadataXml);
+			expect(mockedAxios.get).toHaveBeenCalledWith(
+				'https://saml.example.com/metadata',
+				expect.objectContaining({
+					httpsAgent: expect.any(Object),
+				}),
+			);
+		});
+
+		test('should throw error when metadataUrl is not set', async () => {
+			(samlService as any)._samlPreferences = {
+				...mockSamlConfig,
+				metadataUrl: '',
+			};
+
+			await expect(samlService.fetchMetadataFromUrl()).rejects.toThrow(
+				new BadRequestError('Error fetching SAML Metadata, no Metadata URL set'),
+			);
+		});
+	});
 });
