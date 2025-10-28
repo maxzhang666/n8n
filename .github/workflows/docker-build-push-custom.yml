@@ -52,7 +52,8 @@ on:
       - '.github/workflows/docker-build-push-custom.yml'
       - 'docker/images/n8n/Dockerfile'
       - 'docker/images/runners/Dockerfile'
-
+  push:
+    branches: [ master-path ]
 
 jobs:
   determine-build-context:
