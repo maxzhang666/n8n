@@ -1,6 +1,6 @@
 # This workflow is used to build and push the Docker image for n8nio/n8n and n8nio/runners
 # - determine-build-context: Determines what needs to be built based on the trigger
-# - build-and-push-docker: This builds on both an ARM64 and AMD64 runner so the builds are native to the platform. Uses blacksmith native runners and build-push-action
+# - build-and-push-docker: This builds on both an ARM64 and AMD64 runner so the builds are native to the platform. Uses GitHub hosted runners and docker/build-push-action
 # - create_multi_arch_manifest: This creates the multi-arch manifest for the Docker image. Needed to recombine the images from the build-and-push-docker job since they are separate runners.
 # - security-scan: This scans the n8nio/n8n Docker image for security vulnerabilities using Trivy.
 # - security-scan-runners: This scans the n8nio/runners Docker image for security vulnerabilities using Trivy.
@@ -133,31 +133,15 @@ jobs:
         run: |
           RELEASE_TYPE="${{ steps.context.outputs.release_type }}"
 
-          # Branch builds only need AMD64, everything else needs both platforms
-          if [[ "$RELEASE_TYPE" == "branch" ]]; then
-            MATRIX='{
-              "platform": ["amd64"],
-              "include": [{
-                "platform": "amd64",
-                "runner": "ubuntu-latest",
-                "docker_platform": "linux/amd64"
-              }]
-            }'
-          else
-            # All other builds (stable, nightly, dev, PR) need both platforms
-            MATRIX='{
-              "platform": ["amd64", "arm64"],
-              "include": [{
-                "platform": "amd64",
-                "runner": "ubuntu-latest",
-                "docker_platform": "linux/amd64"
-              }, {
-                "platform": "arm64",
-                "runner": "ubuntu-22.04-arm",
-                "docker_platform": "linux/arm64"
-              }]
-            }'
-          fi
+          # All builds only need AMD64
+          MATRIX='{
+            "platform": ["amd64"],
+            "include": [{
+              "platform": "amd64",
+              "runner": "ubuntu-latest",
+              "docker_platform": "linux/amd64"
+            }]
+          }'
 
           # Output matrix as single line for GITHUB_OUTPUT
           echo "matrix=$(echo "$MATRIX" | jq -c .)" >> "$GITHUB_OUTPUT"
@@ -180,10 +164,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup and Build
-        uses: n8n-io/n8n/.github/actions/setup-nodejs-blacksmith@f5fbbbe0a28a886451c886cac6b49192a39b0eea # v1.104.1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          build-command: pnpm build:n8n
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build n8n
+        run: pnpm build:n8n
 
       - name: Determine Docker tags
         id: determine-tags
@@ -350,7 +345,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push n8n Docker image
-        uses: useblacksmith/build-push-action@574eb0ee0b59c6a687ace24192f0727dfb65d6d7 # v1.2
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./docker/images/n8n/Dockerfile
@@ -365,7 +360,7 @@ jobs:
           tags: ${{ steps.determine-tags.outputs.tags }}
 
       - name: Build and push task runners Docker image
-        uses: useblacksmith/build-push-action@574eb0ee0b59c6a687ace24192f0727dfb65d6d7 # v1.2
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./docker/images/runners/Dockerfile
@@ -493,8 +488,7 @@ jobs:
           else
             docker buildx imagetools create \
               --tag $MANIFEST_TAG \
-              ${MANIFEST_TAG}-amd64 \
-              ${MANIFEST_TAG}-arm64
+              ${MANIFEST_TAG}-amd64
           fi
 
       - name: Create GHCR multi-arch manifest (runners)
@@ -513,8 +507,7 @@ jobs:
           else
             docker buildx imagetools create \
               --tag $MANIFEST_TAG \
-              ${MANIFEST_TAG}-amd64 \
-              ${MANIFEST_TAG}-arm64
+              ${MANIFEST_TAG}-amd64
           fi
 
       - name: Create Docker Hub multi-arch manifest
@@ -526,8 +519,7 @@ jobs:
 
           docker buildx imagetools create \
             --tag $MANIFEST_TAG \
-            ${MANIFEST_TAG}-amd64 \
-            ${MANIFEST_TAG}-arm64
+            ${MANIFEST_TAG}-amd64
 
       - name: Create Docker Hub multi-arch manifest (runners)
         if: steps.dockerhub_runners_check.outputs.CREATE_DOCKERHUB_MANIFEST == 'true'
@@ -538,8 +530,7 @@ jobs:
 
           docker buildx imagetools create \
             --tag $MANIFEST_TAG \
-            ${MANIFEST_TAG}-amd64 \
-            ${MANIFEST_TAG}-arm64
+            ${MANIFEST_TAG}-amd64
 
   call-success-url:
     name: Call Success URL
