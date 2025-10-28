@@ -1,7 +1,7 @@
 # This workflow is used to build and push the Docker image for n8nio/n8n and n8nio/runners
 # - determine-build-context: Determines what needs to be built based on the trigger
-# - build-and-push-docker: This builds on both an ARM64 and AMD64 runner so the builds are native to the platform. Uses GitHub hosted runners and docker/build-push-action
-# - create_multi_arch_manifest: This creates the multi-arch manifest for the Docker image. Needed to recombine the images from the build-and-push-docker job since they are separate runners.
+# - build-and-push-docker: This builds on an AMD64 runner so the builds are native to the platform. Uses GitHub hosted runners and docker/build-push-action
+# - create_multi_arch_manifest: This creates the manifest for the Docker image.
 # - security-scan: This scans the n8nio/n8n Docker image for security vulnerabilities using Trivy.
 # - security-scan-runners: This scans the n8nio/runners Docker image for security vulnerabilities using Trivy.
 
@@ -171,8 +171,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: latest
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
