@@ -53,6 +53,10 @@ on:
       - 'docker/images/n8n/Dockerfile'
       - 'docker/images/runners/Dockerfile'
 
+  branches:
+    - 'master-path'
+
+
 jobs:
   determine-build-context:
     name: Determine Build Context
