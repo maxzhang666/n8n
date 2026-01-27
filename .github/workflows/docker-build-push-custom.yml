@@ -119,8 +119,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Build
-        run: pnpm build:n8n
+      - name: Build and prepare for Docker
+        run: node scripts/build-n8n.mjs
 
       - name: Determine Docker tags for all images
         id: determine-tags
