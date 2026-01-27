@@ -228,9 +228,7 @@ jobs:
 
       - name: Create GHCR multi-arch manifests
         run: |
-          RELEASE_TYPE="${{ needs.determine-build-context.outputs.release_type }}"
-
-          # Function to create manifest for an image
+          # Function to create manifest for an image (AMD64 only)
           create_manifest() {
             local IMAGE_NAME=$1
             local MANIFEST_TAG=$2
@@ -241,18 +239,11 @@ jobs:
             fi
 
             echo "Creating GHCR manifest for $IMAGE_NAME: $MANIFEST_TAG"
-
-            # For branch builds, only AMD64 is built
-            if [[ "$RELEASE_TYPE" == "branch" ]]; then
-              docker buildx imagetools create \
-                --tag "$MANIFEST_TAG" \
-                "${MANIFEST_TAG}-amd64"
-            else
-              docker buildx imagetools create \
-                --tag "$MANIFEST_TAG" \
-                "${MANIFEST_TAG}-amd64" \
-                "${MANIFEST_TAG}-arm64"
-            fi
+            
+            # Only AMD64 is built
+            docker buildx imagetools create \
+              --tag "$MANIFEST_TAG" \
+              "${MANIFEST_TAG}-amd64"
           }
 
           # Create manifests for all images
@@ -286,7 +277,7 @@ jobs:
           VERSION="${{ needs.determine-build-context.outputs.n8n_version }}"
           DOCKER_BASE="${{ secrets.DOCKER_USERNAME }}"
 
-          # Create manifests for each image type
+          # Create manifests for each image type (AMD64 only)
           declare -A images=(
             ["n8n"]="${VERSION}"
             ["runners"]="${VERSION}"
@@ -300,8 +291,7 @@ jobs:
             echo "Creating Docker Hub manifest for $image"
             docker buildx imagetools create \
               --tag "${DOCKER_BASE}/${IMAGE_NAME}:${TAG_SUFFIX}" \
-              "${DOCKER_BASE}/${IMAGE_NAME}:${TAG_SUFFIX}-amd64" \
-              "${DOCKER_BASE}/${IMAGE_NAME}:${TAG_SUFFIX}-arm64"
+              "${DOCKER_BASE}/${IMAGE_NAME}:${TAG_SUFFIX}-amd64"
           done
 
       - name: Tag v1 Docker image on Docker Hub
