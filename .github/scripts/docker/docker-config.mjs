@@ -11,7 +11,7 @@ class BuildContext {
 		let context = {
 			version: '',
 			release_type: '',
-			platforms: ['linux/amd64', 'linux/arm64'],
+			platforms: ['linux/amd64'],
 			push_to_ghcr: true,
 			push_to_docker: false,
 		};
@@ -87,8 +87,8 @@ class BuildContext {
 
 	buildMatrix(platforms) {
 		const runners = {
-			'linux/amd64': 'blacksmith-4vcpu-ubuntu-2204',
-			'linux/arm64': 'blacksmith-4vcpu-ubuntu-2204-arm',
+			'linux/amd64': 'ubuntu-latest',
+			'linux/arm64': 'ubuntu-latest-arm',
 		};
 
 		const matrix = {

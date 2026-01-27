@@ -252,6 +252,11 @@ export class License implements LicenseProvider {
 	}
 
 	isLicensed(feature: BooleanLicenseFeature) {
+		// 🚀 BYPASS: Always return true for all features except showNonProdBanner
+		return true;
+		if (feature === LICENSE_FEATURES.SHOW_NON_PROD_BANNER) {
+			return false;
+		}
 		return this.manager?.hasFeatureEnabled(feature) ?? false;
 	}
 
@@ -380,6 +385,18 @@ export class License implements LicenseProvider {
 	}
 
 	getValue<T extends keyof FeatureReturnType>(feature: T): FeatureReturnType[T] {
+		// 🚀 BYPASS: Return Enterprise values
+		if (feature === 'planName') {
+			return 'Enterprise' as FeatureReturnType[T];
+		}
+
+		// Return unlimited for all quotas
+		if (Object.values(LICENSE_QUOTAS).includes(feature as any)) {
+			return UNLIMITED_LICENSE_QUOTA as FeatureReturnType[T];
+		}
+
+		// Return true for all boolean features
+		return true as FeatureReturnType[T];
 		return this.manager?.getFeatureValue(feature) as FeatureReturnType[T];
 	}
 
@@ -418,26 +435,36 @@ export class License implements LicenseProvider {
 
 	/** @deprecated Use `LicenseState` instead. */
 	getUsersLimit() {
+		// 🚀 BYPASS: Unlimited users
+		return UNLIMITED_LICENSE_QUOTA;
 		return this.getValue(LICENSE_QUOTAS.USERS_LIMIT) ?? UNLIMITED_LICENSE_QUOTA;
 	}
 
 	/** @deprecated Use `LicenseState` instead. */
 	getTriggerLimit() {
+		// 🚀 BYPASS: Unlimited users
+		return UNLIMITED_LICENSE_QUOTA;
 		return this.getValue(LICENSE_QUOTAS.TRIGGER_LIMIT) ?? UNLIMITED_LICENSE_QUOTA;
 	}
 
 	/** @deprecated Use `LicenseState` instead. */
 	getVariablesLimit() {
+		// 🚀 BYPASS: Unlimited users
+		return UNLIMITED_LICENSE_QUOTA;
 		return this.getValue(LICENSE_QUOTAS.VARIABLES_LIMIT) ?? UNLIMITED_LICENSE_QUOTA;
 	}
 
 	/** @deprecated Use `LicenseState` instead. */
 	getAiCredits() {
+		// 🚀 BYPASS: Unlimited users
+		return UNLIMITED_LICENSE_QUOTA;
 		return this.getValue(LICENSE_QUOTAS.AI_CREDITS) ?? 0;
 	}
 
 	/** @deprecated Use `LicenseState` instead. */
 	getWorkflowHistoryPruneLimit() {
+		// 🚀 BYPASS: Unlimited users
+		return UNLIMITED_LICENSE_QUOTA;
 		return (
 			this.getValue(LICENSE_QUOTAS.WORKFLOW_HISTORY_PRUNE_LIMIT) ??
 			DEFAULT_WORKFLOW_HISTORY_PRUNE_LIMIT
@@ -446,10 +473,14 @@ export class License implements LicenseProvider {
 
 	/** @deprecated Use `LicenseState` instead. */
 	getTeamProjectLimit() {
+		// 🚀 BYPASS: Unlimited users
+		return UNLIMITED_LICENSE_QUOTA;
 		return this.getValue(LICENSE_QUOTAS.TEAM_PROJECT_LIMIT) ?? 0;
 	}
 
 	getPlanName(): string {
+		// 🚀 BYPASS: Always return Enterprise
+		return 'Enterprise';
 		return this.getValue('planName') ?? 'Community';
 	}
 
