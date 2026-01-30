@@ -1,6 +1,6 @@
-import type { LicenseProvider } from '@n8n/backend-common';
-import { Logger } from '@n8n/backend-common';
-import { GlobalConfig } from '@n8n/config';
+import type {LicenseProvider} from '@n8n/backend-common';
+import {Logger} from '@n8n/backend-common';
+import {GlobalConfig} from '@n8n/config';
 import {
 	DEFAULT_WORKFLOW_HISTORY_PRUNE_LIMIT,
 	LICENSE_FEATURES,
@@ -10,16 +10,16 @@ import {
 	type BooleanLicenseFeature,
 	type NumericLicenseFeature,
 } from '@n8n/constants';
-import { SettingsRepository } from '@n8n/db';
-import { OnLeaderStepdown, OnLeaderTakeover, OnPubSubEvent, OnShutdown } from '@n8n/decorators';
-import { Container, Service } from '@n8n/di';
-import type { TEntitlement, TLicenseBlock } from '@n8n_io/license-sdk';
-import { LicenseManager } from '@n8n_io/license-sdk';
-import { InstanceSettings } from 'n8n-core';
+import {SettingsRepository} from '@n8n/db';
+import {OnLeaderStepdown, OnLeaderTakeover, OnPubSubEvent, OnShutdown} from '@n8n/decorators';
+import {Container, Service} from '@n8n/di';
+import type {TEntitlement, TLicenseBlock} from '@n8n_io/license-sdk';
+import {LicenseManager} from '@n8n_io/license-sdk';
+import {InstanceSettings} from 'n8n-core';
 
-import { LicenseMetricsService } from '@/metrics/license-metrics.service';
+import {LicenseMetricsService} from '@/metrics/license-metrics.service';
 
-import { N8N_VERSION, SETTINGS_LICENSE_CERT_KEY } from './constants';
+import {N8N_VERSION, SETTINGS_LICENSE_CERT_KEY} from './constants';
 
 const LICENSE_RENEWAL_DISABLED_WARNING =
 	'Automatic license renewal is disabled. The license will not renew automatically, and access to licensed features may be lost!';
@@ -51,9 +51,9 @@ export class License implements LicenseProvider {
 	}
 
 	async init({
-		forceRecreate = false,
-		isCli = false,
-	}: { forceRecreate?: boolean; isCli?: boolean } = {}) {
+							 forceRecreate = false,
+							 isCli = false,
+						 }: { forceRecreate?: boolean; isCli?: boolean } = {}) {
 		if (this.manager && !forceRecreate) {
 			this.logger.warn('License manager already initialized or shutting down');
 			return;
@@ -63,20 +63,23 @@ export class License implements LicenseProvider {
 			return;
 		}
 
-		const { instanceType } = this.instanceSettings;
+		const {instanceType} = this.instanceSettings;
 		const isMainInstance = instanceType === 'main';
 		const server = this.globalConfig.license.serverUrl;
 		const offlineMode = !isMainInstance;
 		const autoRenewOffset = 72 * Time.hours.toSeconds;
 		const saveCertStr = isMainInstance
 			? async (value: TLicenseBlock) => await this.saveCertStr(value)
-			: async () => {};
+			: async () => {
+			};
 		const onFeatureChange = isMainInstance
 			? async () => await this.onFeatureChange()
-			: async () => {};
+			: async () => {
+			};
 		const onLicenseRenewed = isMainInstance
 			? async () => await this.onLicenseRenewed()
-			: async () => {};
+			: async () => {
+			};
 		const collectUsageMetrics = isMainInstance
 			? async () => await this.licenseMetricsService.collectUsageMetrics()
 			: async () => [];
@@ -86,8 +89,8 @@ export class License implements LicenseProvider {
 		const onExpirySoon = !this.instanceSettings.isLeader ? () => this.onExpirySoon() : undefined;
 		const expirySoonOffsetMins = !this.instanceSettings.isLeader ? 120 : undefined;
 
-		const { isLeader } = this.instanceSettings;
-		const { autoRenewalEnabled } = this.globalConfig.license;
+		const {isLeader} = this.instanceSettings;
+		const {autoRenewalEnabled} = this.globalConfig.license;
 		const eligibleToRenew = isCli || isLeader;
 
 		const shouldRenew = eligibleToRenew && autoRenewalEnabled;
@@ -123,7 +126,7 @@ export class License implements LicenseProvider {
 			this.logger.debug('License initialized');
 		} catch (error: unknown) {
 			if (error instanceof Error) {
-				this.logger.error('Could not initialize license manager sdk', { error });
+				this.logger.error('Could not initialize license manager sdk', {error});
 			}
 		}
 	}
@@ -155,8 +158,8 @@ export class License implements LicenseProvider {
 
 	private async broadcastReloadLicenseCommand() {
 		if (this.globalConfig.executions.mode === 'queue' && this.instanceSettings.isLeader) {
-			const { Publisher } = await import('@/scaling/pubsub/publisher.service');
-			await Container.get(Publisher).publishCommand({ command: 'reload-license' });
+			const {Publisher} = await import('@/scaling/pubsub/publisher.service');
+			await Container.get(Publisher).publishCommand({command: 'reload-license'});
 		}
 	}
 
@@ -193,7 +196,7 @@ export class License implements LicenseProvider {
 			try {
 				refreshCallback(cert);
 			} catch (error) {
-				this.logger.error('Error in license refresh callback', { error });
+				this.logger.error('Error in license refresh callback', {error});
 			}
 		}
 	}
@@ -205,7 +208,7 @@ export class License implements LicenseProvider {
 			return;
 		}
 
-		await this.manager.activate(activationKey, { eulaUri, email: userEmail });
+		await this.manager.activate(activationKey, {eulaUri, email: userEmail});
 		this.logger.debug('License activated');
 	}
 
@@ -253,10 +256,10 @@ export class License implements LicenseProvider {
 
 	isLicensed(feature: BooleanLicenseFeature) {
 		// 🚀 BYPASS: Always return true for all features except showNonProdBanner
-		return true;
 		if (feature === LICENSE_FEATURES.SHOW_NON_PROD_BANNER) {
 			return false;
 		}
+		return true;
 		return this.manager?.hasFeatureEnabled(feature) ?? false;
 	}
 
